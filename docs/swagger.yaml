@@ -1,0 +1,503 @@
+openapi: 3.0.0
+info:
+  title: Library Management System API
+  version: 1.0.0
+  description: REST API for the Library Management System built with Node.js and Express.
+
+servers:
+  - url: http://localhost:3000/api/v1
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          example: admin@library.com
+        password:
+          type: string
+          example: password123
+
+    LoginResponse:
+      type: object
+      properties:
+        token:
+          type: string
+        role:
+          type: string
+          example: admin
+        name:
+          type: string
+          example: Admin User
+
+    Book:
+      type: object
+      properties:
+        book_id:
+          type: integer
+        title:
+          type: string
+        author:
+          type: string
+        isbn:
+          type: string
+        published_year:
+          type: integer
+        publisher:
+          type: string
+        available_copies:
+          type: integer
+
+    NewBook:
+      type: object
+      required: [title, author, isbn]
+      properties:
+        title:
+          type: string
+          example: Clean Code
+        author:
+          type: string
+          example: Robert C. Martin
+        isbn:
+          type: string
+          example: 978-0132350884
+        publisher_id:
+          type: integer
+        published_year:
+          type: integer
+        total_copies:
+          type: integer
+
+    Member:
+      type: object
+      properties:
+        member_id:
+          type: integer
+        full_name:
+          type: string
+        email:
+          type: string
+        phone:
+          type: string
+        membership_date:
+          type: string
+          format: date
+        status:
+          type: string
+          enum: [active, suspended, expired]
+
+    NewMember:
+      type: object
+      required: [full_name, email]
+      properties:
+        full_name:
+          type: string
+          example: Ali Hassan
+        email:
+          type: string
+          example: ali@gmail.com
+        phone:
+          type: string
+        address:
+          type: string
+
+    BorrowRequest:
+      type: object
+      required: [member_id, book_id]
+      properties:
+        member_id:
+          type: integer
+          example: 1
+        book_id:
+          type: integer
+          example: 1
+
+    ReturnRequest:
+      type: object
+      required: [loan_id]
+      properties:
+        loan_id:
+          type: integer
+          example: 1
+
+    Loan:
+      type: object
+      properties:
+        loan_id:
+          type: integer
+        member_name:
+          type: string
+        book_title:
+          type: string
+        borrow_date:
+          type: string
+          format: date
+        due_date:
+          type: string
+          format: date
+        return_date:
+          type: string
+          format: date
+          nullable: true
+
+    Fine:
+      type: object
+      properties:
+        fine_id:
+          type: integer
+        member_name:
+          type: string
+        amount:
+          type: number
+        issued_date:
+          type: string
+          format: date
+        paid:
+          type: boolean
+
+paths:
+
+  /auth/login:
+    post:
+      summary: Login and get JWT token
+      tags: [Auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '401':
+          description: Invalid credentials
+
+  /books:
+    get:
+      summary: Get all books with available copy count
+      tags: [Books]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: List of books
+        '401':
+          description: Unauthorized
+    post:
+      summary: Add a new book
+      tags: [Books]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NewBook'
+      responses:
+        '201':
+          description: Book created
+        '400':
+          description: Missing required fields
+        '403':
+          description: Insufficient permissions - admin or librarian required
+
+  /books/{id}:
+    get:
+      summary: Get a single book with its copies
+      tags: [Books]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Book details with copies
+        '404':
+          description: Book not found
+    put:
+      summary: Update an existing book
+      tags: [Books]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NewBook'
+      responses:
+        '200':
+          description: Book updated
+        '400':
+          description: Missing required fields
+        '403':
+          description: Insufficient permissions - admin or librarian required
+        '404':
+          description: Book not found
+    delete:
+      summary: Delete a book
+      tags: [Books]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Book deleted
+        '403':
+          description: Insufficient permissions - admin only
+
+  /members:
+    get:
+      summary: Get all members
+      tags: [Members]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: List of members
+    post:
+      summary: Register a new member
+      tags: [Members]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NewMember'
+      responses:
+        '201':
+          description: Member created
+        '400':
+          description: Missing required fields
+
+  /members/{id}:
+    get:
+      summary: Get a single member
+      tags: [Members]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Member details
+        '404':
+          description: Member not found
+
+  /members/{id}/status:
+    patch:
+      summary: Update member status
+      tags: [Members]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  type: string
+                  enum: [active, suspended, expired]
+      responses:
+        '200':
+          description: Status updated
+        '400':
+          description: Invalid status
+        '403':
+          description: Insufficient permissions - admin only
+
+  /members/{id}/fines:
+    get:
+      summary: Get unpaid fines for a member
+      tags: [Members]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: List of unpaid fines
+
+  /loans:
+    get:
+      summary: Get all loans
+      tags: [Loans]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: List of loans
+
+  /loans/overdue:
+    get:
+      summary: Get all overdue loans
+      tags: [Loans]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: List of overdue loans
+
+  /loans/borrow:
+    post:
+      summary: Borrow a book - full ACID transaction
+      tags: [Loans]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BorrowRequest'
+      responses:
+        '201':
+          description: Book borrowed successfully
+          content:
+            application/json:
+              example:
+                message: Book borrowed successfully.
+                loan:
+                  loan_id: 26
+                  member_id: 1
+                  copy_id: 2
+                  borrow_date: "2026-03-25"
+                  due_date: "2026-04-08"
+        '403':
+          description: Member suspended, expired, or has unpaid fines
+          content:
+            application/json:
+              example:
+                error: Member account is suspended. Cannot borrow.
+        '404':
+          description: Member not found
+        '409':
+          description: No available copies
+          content:
+            application/json:
+              example:
+                error: No available copies. Please make a reservation.
+        '500':
+          description: Transaction failed and rolled back
+
+  /loans/return:
+    post:
+      summary: Return a book - full ACID transaction
+      tags: [Loans]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReturnRequest'
+      responses:
+        '200':
+          description: Book returned successfully
+          content:
+            application/json:
+              example:
+                message: Book returned successfully.
+                loan:
+                  loan_id: 1
+                  return_date: "2026-03-25"
+                fine: null
+                next_reservation: null
+        '404':
+          description: Loan not found
+        '409':
+          description: Already returned
+        '500':
+          description: Transaction failed and rolled back
+
+  /fines:
+    get:
+      summary: Get all fines
+      tags: [Fines]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: List of fines
+
+  /fines/revenue:
+    get:
+      summary: Monthly fine revenue from database view
+      tags: [Fines]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Monthly revenue breakdown
+        '403':
+          description: Insufficient permissions - admin only
+
+  /fines/{id}/pay:
+    patch:
+      summary: Mark a fine as paid
+      tags: [Fines]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Fine marked as paid
+        '404':
+          description: Fine not found
